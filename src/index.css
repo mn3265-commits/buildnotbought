@@ -1,0 +1,95 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #050506;
+  font-family: 'Archivo', system-ui, sans-serif;
+  color: #f4f4f5;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  color: #ccff00;
+  text-decoration: none;
+}
+a:hover {
+  color: #e4ff66;
+}
+
+/* hide scrollbars — matches the prototype's chrome-free look */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+* {
+  scrollbar-width: none;
+}
+
+input {
+  font-family: inherit;
+}
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+button {
+  font-family: inherit;
+}
+
+@keyframes repmove {
+  0% {
+    transform: translateY(0);
+  }
+  45% {
+    transform: translateY(118px);
+  }
+  55% {
+    transform: translateY(118px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+@keyframes pulseDot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes ringspin {
+  to {
+    transform: rotate(360deg);
+  }
+}

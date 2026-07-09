@@ -1,0 +1,14 @@
+node_modules
+dist
+dist-single
+dist-ssr
+*.local
+.DS_Store
+.vite
+
+# local SQLite database (your data — never commit); root only, not src/data
+/data/
+
+tsconfig.app.tsbuildinfo
+tsconfig.node.tsbuildinfo
+*.tsbuildinfo
