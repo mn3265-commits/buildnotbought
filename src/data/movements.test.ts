@@ -1,49 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { MOVEMENT_PATTERN, PATTERNS, patternFor, tempoTiming, type Pose } from './movements'
+import { MOVEMENT_PATTERN, PATTERNS, distPt, localSkeleton, patternFor, repPath, sceneSkeleton, tempoTiming } from './movements'
 import { SEED_EXERCISES } from './exercises'
 
-// Mirrors the segment lengths in MovementPreview.
-const TORSO = 26
-const UPPER_ARM = 13
-const FOREARM = 13
-const THIGH = 18
-const SHIN = 18
-
-type Pt = { x: number; y: number }
-const rad = (d: number) => (d * Math.PI) / 180
-/** SVG rotate(a): (x,y) -> (x cos a - y sin a, x sin a + y cos a) */
-const rot = (p: Pt, a: number): Pt => ({
-  x: p.x * Math.cos(rad(a)) - p.y * Math.sin(rad(a)),
-  y: p.x * Math.sin(rad(a)) + p.y * Math.cos(rad(a)),
-})
-const add = (a: Pt, b: Pt): Pt => ({ x: a.x + b.x, y: a.y + b.y })
-const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y)
-
 /**
- * Forward kinematics for the end effectors, in scene units.
- * Joint angles alone are a bad proxy for motion: the incline press once had a
- * 28° shoulder and 70° elbow swing that largely cancelled at the hand, so the
- * dumbbell barely moved. Only the hand and foot tell the truth.
+ * Furthest an end effector travels between the top and bottom of the rep.
+ * Uses the same forward kinematics the renderer uses, so the test cannot drift
+ * from what is drawn. Joint angles alone are a bad proxy: the incline press
+ * once had a 28° shoulder and a 70° elbow swing that cancelled at the hand, so
+ * the dumbbell barely moved. Only the hand and foot tell the truth.
  */
-function endpoints(p: Pose): { hand: Pt; foot: Pt } {
-  const pelvis = { x: p.dx, y: p.dy }
-
-  const shoulder = add(pelvis, rot({ x: 0, y: -TORSO + 2 }, p.torso))
-  const elbow = add(shoulder, rot({ x: 0, y: UPPER_ARM }, p.torso + p.shoulder))
-  const hand = add(elbow, rot({ x: 0, y: FOREARM }, p.torso + p.shoulder + p.elbow))
-
-  const knee = add(pelvis, rot({ x: 0, y: THIGH }, p.hip))
-  const foot = add(knee, rot({ x: 0, y: SHIN }, p.hip + p.knee))
-
-  return { hand, foot }
-}
-
-/** Furthest an end effector travels between the top and bottom of the rep. */
 const travel = (key: string): number => {
   const p = PATTERNS[key]!
-  const t = endpoints(p.top)
-  const b = endpoints(p.bottom)
-  return Math.max(dist(t.hand, b.hand), dist(t.foot, b.foot))
+  const t = localSkeleton(p.top)
+  const b = localSkeleton(p.bottom)
+  return Math.max(distPt(t.hand, b.hand), distPt(t.foot, b.foot))
 }
 
 describe('movement patterns', () => {
@@ -113,5 +83,40 @@ describe('tempoTiming', () => {
 
   it('emits one fewer keySpline interval than keyTimes (SMIL requirement)', () => {
     expect(tempoTiming([2, 1, 1]).keyTimes.split(';')).toHaveLength(4)
+  })
+})
+
+describe('skeleton geometry', () => {
+  it('places the figure in the scene: pelvis lands on the pattern origin', () => {
+    const p = PATTERNS.squat!
+    const s = sceneSkeleton(p, p.top)
+    expect(s.pelvis.x).toBeCloseTo(46, 1)
+    expect(s.pelvis.y).toBeCloseTo(56, 1)
+  })
+
+  it('keeps every joint inside the 100x104 viewBox at both ends of the rep', () => {
+    const out: string[] = []
+    for (const [key, pat] of Object.entries(PATTERNS)) {
+      for (const pose of [pat.top, pat.bottom]) {
+        const s = sceneSkeleton(pat, pose)
+        for (const [joint, pt] of Object.entries(s)) {
+          if (pt.x < -6 || pt.x > 106 || pt.y < -6 || pt.y > 110) out.push(`${key}.${joint}`)
+        }
+      }
+    }
+    expect(out).toEqual([])
+  })
+
+  it('points the direction arrow along whichever end effector carries the rep', () => {
+    // leg press is driven by the feet, curl by the hand
+    const lp = PATTERNS.legPress!
+    const lpFoot = distPt(sceneSkeleton(lp, lp.top).foot, sceneSkeleton(lp, lp.bottom).foot)
+    const lpPath = repPath(lp)
+    expect(distPt(lpPath.from, lpPath.to)).toBeCloseTo(lpFoot, 1)
+
+    const c = PATTERNS.curl!
+    const cHand = distPt(sceneSkeleton(c, c.top).hand, sceneSkeleton(c, c.bottom).hand)
+    const cPath = repPath(c)
+    expect(distPt(cPath.from, cPath.to)).toBeCloseTo(cHand, 1)
   })
 })

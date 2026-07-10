@@ -27,7 +27,7 @@ export interface Pose {
 }
 
 /** What the figure is braced against — drawn behind it. */
-export type Prop = 'floor' | 'bench' | 'incline' | 'legPress' | 'seat' | 'bar' | 'cable'
+export type Prop = 'floor' | 'rack' | 'bench' | 'incline' | 'legPress' | 'seat' | 'bar' | 'cable'
 
 export interface Pattern {
   /** rep starts here (the "top") */
@@ -41,6 +41,8 @@ export interface Pattern {
   origin?: { x: number; y: number }
   /** what the hands hold */
   load: 'barbell' | 'dumbbell' | 'handle' | 'none'
+  /** cable machines: where the cable is anchored, so it can be drawn to the hand */
+  pulley?: { x: number; y: number }
 }
 
 const P = (o: Partial<Pose>): Pose => ({ torso: 0, shoulder: 0, elbow: 0, hip: 0, knee: 0, dx: 0, dy: 0, ...o })
@@ -49,7 +51,7 @@ export const PATTERNS: Record<string, Pattern> = {
   squat: {
     top: P({ torso: 6, shoulder: 152, elbow: 104 }),
     bottom: P({ torso: 30, shoulder: 152, elbow: 104, hip: -70, knee: 76, dx: -5, dy: 17 }),
-    prop: 'floor',
+    prop: 'rack',
     load: 'barbell',
   },
   deadlift: {
@@ -74,15 +76,15 @@ export const PATTERNS: Record<string, Pattern> = {
   overheadPress: {
     top: P({ torso: 0, shoulder: 176, elbow: 4 }),
     bottom: P({ torso: 3, shoulder: 150, elbow: 132 }),
-    prop: 'floor',
+    prop: 'rack',
     load: 'barbell',
   },
   benchPress: {
-    top: P({ torso: 0, shoulder: 90, elbow: 0, hip: 118, knee: 66 }),
-    bottom: P({ torso: 0, shoulder: 68, elbow: 124, hip: 118, knee: 66 }),
+    // torso -90 lays the upper body along the bench; the legs still hang to the floor
+    top: P({ torso: -90, shoulder: 270, elbow: 0, hip: 0, knee: 30 }),
+    bottom: P({ torso: -90, shoulder: 242, elbow: 106, hip: 0, knee: 30 }),
     prop: 'bench',
-    rootRot: -90,
-    origin: { x: 60, y: 66 },
+    origin: { x: 58, y: 60 },
     load: 'barbell',
   },
   inclinePress: {
@@ -94,10 +96,10 @@ export const PATTERNS: Record<string, Pattern> = {
     load: 'dumbbell',
   },
   pullUp: {
-    top: P({ torso: -4, shoulder: 150, elbow: 92, hip: 6, knee: -34, dy: 14 }),
-    bottom: P({ torso: 0, shoulder: 177, elbow: 2, hip: 4, knee: -22, dy: 34 }),
+    top: P({ torso: -4, shoulder: 150, elbow: 92, hip: 6, knee: -34, dy: 10 }),
+    bottom: P({ torso: 0, shoulder: 177, elbow: 2, hip: 4, knee: -22, dy: 19 }),
     prop: 'bar',
-    origin: { x: 48, y: 42 },
+    origin: { x: 48, y: 46 },
     load: 'none',
   },
   pulldown: {
@@ -106,6 +108,7 @@ export const PATTERNS: Record<string, Pattern> = {
     prop: 'seat',
     origin: { x: 44, y: 62 },
     load: 'handle',
+    pulley: { x: 44, y: 6 },
   },
   curl: {
     top: P({ torso: 0, shoulder: 6, elbow: 146 }),
@@ -118,6 +121,7 @@ export const PATTERNS: Record<string, Pattern> = {
     bottom: P({ torso: 12, shoulder: 22, elbow: 96 }),
     prop: 'cable',
     load: 'handle',
+    pulley: { x: 78, y: 8 },
   },
   lateralRaise: {
     top: P({ torso: 2, shoulder: 88, elbow: 8 }),
@@ -235,4 +239,73 @@ export function tempoTiming(tempo: [number, number, number]): { dur: number; key
   const t1 = ecc / total
   const t2 = (ecc + pause) / total
   return { dur: total, keyTimes: `0;${t1.toFixed(4)};${t2.toFixed(4)};1` }
+}
+
+// ── Skeleton geometry ────────────────────────────────────────────────────────
+/** Segment lengths, shared by the renderer and the pose tests. */
+export const SEG = { TORSO: 26, UPPER_ARM: 13, FOREARM: 13, THIGH: 18, SHIN: 18 } as const
+
+export interface Pt {
+  x: number
+  y: number
+}
+
+const rad = (d: number) => (d * Math.PI) / 180
+/** SVG rotate(a): (x,y) -> (x cos a - y sin a, x sin a + y cos a) */
+export const rotatePt = (p: Pt, a: number): Pt => ({
+  x: p.x * Math.cos(rad(a)) - p.y * Math.sin(rad(a)),
+  y: p.x * Math.sin(rad(a)) + p.y * Math.cos(rad(a)),
+})
+const add = (a: Pt, b: Pt): Pt => ({ x: a.x + b.x, y: a.y + b.y })
+export const distPt = (a: Pt, b: Pt): number => Math.hypot(a.x - b.x, a.y - b.y)
+
+export interface Skeleton {
+  pelvis: Pt
+  shoulder: Pt
+  head: Pt
+  elbow: Pt
+  hand: Pt
+  knee: Pt
+  foot: Pt
+}
+
+/**
+ * Forward kinematics in the figure's own frame (before the root transform).
+ * The renderer needs this to draw anything that connects to the body — a cable
+ * running to the hand, an arrow along the bar path — and the tests need it
+ * because joint angles lie: a shoulder and an elbow can swing in opposition and
+ * cancel each other at the hand.
+ */
+export function localSkeleton(p: Pose): Skeleton {
+  const pelvis = { x: p.dx, y: p.dy }
+  const shoulder = add(pelvis, rotatePt({ x: 0, y: -SEG.TORSO + 2 }, p.torso))
+  const head = add(pelvis, rotatePt({ x: 0, y: -SEG.TORSO - 8 }, p.torso))
+  const elbow = add(shoulder, rotatePt({ x: 0, y: SEG.UPPER_ARM }, p.torso + p.shoulder))
+  const hand = add(elbow, rotatePt({ x: 0, y: SEG.FOREARM }, p.torso + p.shoulder + p.elbow))
+  const knee = add(pelvis, rotatePt({ x: 0, y: SEG.THIGH }, p.hip))
+  const foot = add(knee, rotatePt({ x: 0, y: SEG.SHIN }, p.hip + p.knee))
+  return { pelvis, shoulder, head, elbow, hand, knee, foot }
+}
+
+/** The same points in scene coordinates: origin + rotate(rootRot) * local. */
+export function sceneSkeleton(pat: Pattern, p: Pose): Skeleton {
+  const o = pat.origin ?? { x: 46, y: 56 }
+  const place = (q: Pt) => add(o, rotatePt(q, pat.rootRot ?? 0))
+  const s = localSkeleton(p)
+  return {
+    pelvis: place(s.pelvis),
+    shoulder: place(s.shoulder),
+    head: place(s.head),
+    elbow: place(s.elbow),
+    hand: place(s.hand),
+    knee: place(s.knee),
+    foot: place(s.foot),
+  }
+}
+
+/** Which end effector carries the rep — that is what the direction arrow follows. */
+export function repPath(pat: Pattern): { from: Pt; to: Pt } {
+  const t = sceneSkeleton(pat, pat.top)
+  const b = sceneSkeleton(pat, pat.bottom)
+  return distPt(t.hand, b.hand) >= distPt(t.foot, b.foot) ? { from: t.hand, to: b.hand } : { from: t.foot, to: b.foot }
 }
