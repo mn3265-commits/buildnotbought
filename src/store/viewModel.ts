@@ -18,7 +18,9 @@ import {
   rankInfo,
   renderBody,
   repTop,
-  tailoredExercises,
+  effectiveExercises,
+  performedStats,
+  resolveAlts,
   toNum,
 } from '../lib/calc'
 
@@ -32,7 +34,7 @@ const roleInfo = (r: Role) =>
 const equipOf = (name: string) => EQUIP[name] || 'Other'
 
 function build(S: AppState, A: Actions) {
-  const ex = tailoredExercises(S.profile.bw, S.tailoredDone)
+  const ex = effectiveExercises(S.profile.bw, S.tailoredDone, S.lifts)
   const unitOf = (name: string) => S.units[name] || 'kg'
   const kg = (n: number, name: string) => fmtWeight(n, unitOf(name))
   const num = (n: number, name: string) => toNum(n, unitOf(name))
@@ -202,21 +204,25 @@ function build(S: AppState, A: Actions) {
   const achEarned = achDefs.filter((a) => a.earned).length
 
   // ── top targets ──
-  const topIds = [11, 6, 1, 8]
-  const topTargets = topIds.map((id) => {
-    const e = ex.find((x) => x.id === id)!
-    return {
+  // What he should care about today: the lifts he is about to train, heaviest
+  // roles first, then whichever is closest to its goal. On a rest day, fall
+  // back to the key lifts across the whole program.
+  const roleRank: Record<Role, number> = { key: 0, main: 1, accessory: 2 }
+  const targetPool = todayEx.length ? todayEx : ex
+  const topTargets = [...targetPool]
+    .sort((a, b) => roleRank[a.role] - roleRank[b.role] || pctVal(b) - pctVal(a))
+    .slice(0, 4)
+    .map((e) => ({
       name: e.name,
       currentStr: kg(e.current, e.name),
       nextStr: kg(nextWeight(e), e.name),
       pct: `${pctVal(e)}%`,
       color: C[e.group],
       onTap: () => {
-        A.setProg(id)
+        A.setProg(e.id)
         A.go('progress')
       },
-    }
-  })
+    }))
 
   // ── train ──
   const trainPreview = !S.workout
@@ -246,8 +252,8 @@ function build(S: AppState, A: Actions) {
         const opts = [{ name: src.name, note: 'Original movement', orig: true }].concat(
           src.alts.map((a) => ({ name: a.n, note: a.w, orig: false })),
         )
-        const altObj = swapped ? src.alts.find((a) => a.n === display) : null
-        const stats2 = altObj || src
+        const resolvedAlts = resolveAlts(src, S.lifts)
+        const stats2 = performedStats(src, S.swaps, S.lifts)
         const gr = repTop(src)
         const allDone = exi.sets.length > 0 && exi.sets.every((s) => s.done)
         const allMet = allDone && exi.sets.every((s) => s.weight >= exi.next && s.reps >= gr)
@@ -300,7 +306,7 @@ function build(S: AppState, A: Actions) {
           onSwap: () => A.toggleSwap(exi.id),
           altOptions: opts.map((o) => {
             const cur = display === o.name
-            const os = o.orig ? src : src.alts.find((a) => a.n === o.name)!
+            const os = o.orig ? src : resolvedAlts.find((a) => a.n === o.name)!
             return {
               name: o.name,
               note: o.note,
@@ -394,20 +400,18 @@ function build(S: AppState, A: Actions) {
 
   // ── detail ──
   const de = ex.find((x) => x.id === S.exId) || ex[0]!
-  const tempoTotal = de.tempo[0] + de.tempo[1] + de.tempo[2]
   const dri = roleInfo(de.role)
   const dUnit = unitOf(de.name)
   const detail = {
     name: de.name,
     group: de.group,
     color: C[de.group],
-    slotId: `ex-demo-${de.id}`,
     roleLabel: dri.label,
     roleColor: dri.color,
     roleBg: dri.bg,
     roleBorder: dri.border,
     equip: equipOf(de.name),
-    alts: de.alts.map((a) => ({
+    alts: resolveAlts(de, S.lifts).map((a) => ({
       name: a.n,
       note: a.w,
       equip: equipOf(a.n),
@@ -423,7 +427,12 @@ function build(S: AppState, A: Actions) {
     currentStr: kg(de.current, de.name),
     goalStr: kg(de.goal, de.name),
     nextStr: kg(nextWeight(de), de.name),
-    tempoDur: `${tempoTotal * 0.8}s`,
+    tempo: de.tempo,
+    tempoParts: [
+      { label: 'DOWN', sec: de.tempo[0], color: '#F4F4F5' },
+      { label: 'HOLD', sec: de.tempo[1], color: '#8a8a93' },
+      { label: 'UP', sec: de.tempo[2], color: VOLT },
+    ],
     tempoStr: de.tempo.join('-'),
     targetHint: `Add ${kg(de.inc, de.name)} once you clear the top of your rep range for all sets with good form.`,
     muscles: de.muscles.map((m, i) => ({
@@ -437,23 +446,36 @@ function build(S: AppState, A: Actions) {
   }
 
   // ── progress ──
+  // The curve is real logged top sets. Before there are two of them there is
+  // nothing honest to draw, so the screen says so rather than inventing a line.
   const pe = ex.find((x) => x.id === S.progId) || ex[0]!
-  const h = pe.hist
+  const entries = S.lifts[pe.name]?.history ?? []
+  const h = entries.map((e) => e.weight)
+  const hasCurve = h.length >= 2
   const Wd = 300
   const Hd = 130
   const pad = 8
-  const vmin = pe.start * 0.96
-  const vmax = pe.goal * 1.02
-  const px = (i: number) => pad + (i * (Wd - 2 * pad)) / (h.length - 1)
-  const py = (v: number) => Hd - pad - ((v - vmin) / (vmax - vmin)) * (Hd - 2 * pad)
+  const vmin = Math.min(pe.start, ...h) * 0.96
+  const vmax = Math.max(pe.goal, ...h) * 1.02
+  const span = vmax - vmin || 1
+  const px = (i: number) => (h.length < 2 ? Wd / 2 : pad + (i * (Wd - 2 * pad)) / (h.length - 1))
+  const py = (v: number) => Hd - pad - ((v - vmin) / span) * (Hd - 2 * pad)
   const dots = h.map((v, i) => ({ x: px(i).toFixed(1), y: py(v).toFixed(1) }))
   const linePts = dots.map((d) => `${d.x},${d.y}`).join(' ')
-  const areaPts = `${px(0).toFixed(1)},${Hd - pad} ${linePts} ${px(h.length - 1).toFixed(1)},${Hd - pad}`
+  const areaPts = hasCurve ? `${px(0).toFixed(1)},${Hd - pad} ${linePts} ${px(h.length - 1).toFixed(1)},${Hd - pad}` : ''
+  const bestE1rm = entries.reduce((b, e) => Math.max(b, e.e1rm), 0)
   const prog = {
     name: pe.name,
     group: pe.group,
     color: C[pe.group],
     pct: `${pctVal(pe)}%`,
+    hasCurve,
+    sessionCount: entries.length,
+    emptyHint:
+      entries.length === 0
+        ? 'No sessions logged for this lift yet — train it once and your curve starts here.'
+        : 'One session in. Log another to draw the curve.',
+    bestE1rmStr: bestE1rm > 0 ? kg(Math.round(bestE1rm * 10) / 10, pe.name) : '—',
     linePts,
     areaPts,
     goalY: py(pe.goal).toFixed(1),

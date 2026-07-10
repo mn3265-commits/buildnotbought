@@ -1,5 +1,5 @@
 import { RANKS, SEED_EXERCISES, TAILOR_RATIOS } from '../data/exercises'
-import type { Exercise, Group, MuscleState, Rank, Unit, Zone } from '../data/types'
+import type { Exercise, Group, LiftProgress, MuscleState, Rank, ResolvedAlt, Unit, Zone } from '../data/types'
 import { VOLT } from '../data/tokens'
 
 /**
@@ -167,32 +167,126 @@ export function proteinFor(weightKg: number): Protein {
 }
 
 // ── Tailoring ────────────────────────────────────────────────────────────────
+export const roundInc = (v: number, inc: number): number => Math.max(inc, Math.round(v / inc) * inc)
+
+/** Goal is never a ceiling you can get stuck against: clearing it pushes it out. */
+const GOAL_STRETCH = 1.15
+
 /**
- * Derive the effective exercise catalog from the seed + profile.
- * When not tailored (or no valid bodyweight) it returns a clean clone of the seed,
- * so tailoring is a pure function of (profile, tailoredDone) — no hidden mutation.
+ * Derive the seeded/tailored baseline catalog from the profile alone.
+ * This is what a lift is worth *before* you have trained it. Pure in
+ * (profile, tailoredDone) — no hidden mutation, no fabricated history.
  */
 export function tailoredExercises(bwStr: string, tailoredDone: boolean): Exercise[] {
   const seed = SEED_EXERCISES.map((e) => ({ ...e, alts: e.alts.map((a) => ({ ...a })) }))
   const bw = parseFloat(bwStr)
   if (!tailoredDone || !bw || bw < 25) return seed
 
-  const roundInc = (v: number, inc: number) => Math.max(inc, Math.round(v / inc) * inc)
   seed.forEach((e) => {
-    const baseCur = e.current // seed value is the immutable baseline
     const r = TAILOR_RATIOS[e.id] ?? 0.5
     const cur = roundInc(bw * r, e.inc)
-    const factor = cur / baseCur
     e.current = cur
     e.goal = Math.max(roundInc(cur * 1.3, e.inc), cur + e.inc)
     e.start = Math.min(Math.max(0, roundInc(cur * 0.72, e.inc)), cur)
-    e.hist = Array.from({ length: 6 }, (_, i) => roundInc(e.start + (cur - e.start) * (i / 5), e.inc))
-    e.alts.forEach((a) => {
-      const baseA = { current: a.current, goal: a.goal, start: a.start }
-      a.current = roundInc(baseA.current * factor, a.inc)
-      a.goal = Math.max(roundInc(baseA.goal * factor, a.inc), a.current + a.inc)
-      a.start = Math.min(Math.max(0, roundInc(baseA.start * factor, a.inc)), a.current)
-    })
   })
   return seed
+}
+
+// ── Earned progression ───────────────────────────────────────────────────────
+/** Epley estimated 1RM. Comparable across rep counts, so the chart is honest. */
+export function e1rm(weight: number, reps: number): number {
+  if (weight <= 0 || reps <= 0) return 0
+  if (reps === 1) return weight
+  return Math.round(weight * (1 + reps / 30) * 10) / 10
+}
+
+/** Push the goal out once it's been reached, so progression never stalls. */
+export function stretchGoal(current: number, goal: number, inc: number): number {
+  if (current < goal) return goal
+  return Math.max(roundInc(current * GOAL_STRETCH, inc), current + inc)
+}
+
+/**
+ * Overlay real, earned progress on top of the baseline. A movement the user has
+ * actually trained is described by `lifts[name]`; everything else falls back to
+ * the seeded/tailored numbers.
+ */
+export function effectiveExercises(bwStr: string, tailoredDone: boolean, lifts: Record<string, LiftProgress>): Exercise[] {
+  return tailoredExercises(bwStr, tailoredDone).map((e) => {
+    const p = lifts[e.name]
+    return p ? { ...e, start: p.start, current: p.current, goal: p.goal } : e
+  })
+}
+
+/**
+ * Resolve a lift's alternatives to concrete weights. An untrained alt is scaled
+ * off its parent (`ratio`); once trained it carries its own earned progress.
+ */
+export function resolveAlts(e: Exercise, lifts: Record<string, LiftProgress>): ResolvedAlt[] {
+  return e.alts.map((a) => {
+    const p = lifts[a.n]
+    if (p) return { ...a, start: p.start, current: p.current, goal: p.goal }
+    const current = roundInc(e.current * a.ratio, a.inc)
+    return {
+      ...a,
+      current,
+      goal: Math.max(roundInc(e.goal * a.ratio, a.inc), current + a.inc),
+      start: Math.min(Math.max(0, roundInc(e.start * a.ratio, a.inc)), current),
+    }
+  })
+}
+
+/** The movement actually performed for a slot — the swapped-in alt, or the lift itself. */
+export function performedName(e: Exercise, swaps: Record<number, string>): string {
+  return swaps[e.id] || e.name
+}
+
+/** Baseline stats + increment for whatever movement is actually being performed. */
+export function performedStats(
+  e: Exercise,
+  swaps: Record<number, string>,
+  lifts: Record<string, LiftProgress>,
+): { name: string; start: number; current: number; goal: number; inc: number } {
+  const name = performedName(e, swaps)
+  if (name === e.name) return { name, start: e.start, current: e.current, goal: e.goal, inc: e.inc }
+  const alt = resolveAlts(e, lifts).find((a) => a.n === name)
+  if (!alt) return { name: e.name, start: e.start, current: e.current, goal: e.goal, inc: e.inc }
+  return { name, start: alt.start, current: alt.current, goal: alt.goal, inc: alt.inc }
+}
+
+export interface SetResult {
+  weight: number
+  reps: number
+  goalReps: number
+  target: number
+  done: boolean
+}
+
+/**
+ * Fold one finished exercise's sets into its earned progression.
+ *
+ * Double progression: the working weight only moves up when every planned set
+ * was completed at or above the target weight *and* the top of the rep range.
+ * A bad session never drags the weight back down — it just doesn't advance —
+ * because auto-deloading on a single off day would fight the user, not help.
+ */
+export function progressLift(prev: LiftProgress, sets: SetResult[], inc: number, date: string): LiftProgress {
+  const done = sets.filter((s) => s.done)
+  if (!done.length) return prev
+
+  const top = done.reduce((best, s) => (e1rm(s.weight, s.reps) > e1rm(best.weight, best.reps) ? s : best), done[0]!)
+  const allPlannedDone = sets.length > 0 && sets.every((s) => s.done)
+  const allMet = allPlannedDone && sets.every((s) => s.weight >= s.target && s.reps >= s.goalReps)
+
+  // The weight he carried across *every* set is what he owns — not his best single.
+  const carried = Math.min(...done.map((s) => s.weight))
+  const current = allMet ? Math.max(prev.current, carried) : prev.current
+  const goal = stretchGoal(current, prev.goal, inc)
+
+  return {
+    start: prev.start,
+    current,
+    goal,
+    history: [...prev.history, { date, weight: top.weight, reps: top.reps, e1rm: e1rm(top.weight, top.reps) }].slice(-120),
+  }
 }

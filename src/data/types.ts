@@ -8,10 +8,21 @@ export interface Alt {
   n: string
   /** why you'd pick it */
   w: string
+  /**
+   * Working weight relative to the parent lift, e.g. 0.4 means a dumbbell bench
+   * is worked at ~40% of the barbell bench load. Weights are derived from the
+   * parent rather than hardcoded, so an alt tracks the parent as it progresses —
+   * until you actually train it, after which its own logged progress takes over.
+   */
+  ratio: number
+  inc: number
+}
+
+/** An alt with its weights resolved against the parent lift. */
+export interface ResolvedAlt extends Alt {
   start: number
   current: number
   goal: number
-  inc: number
 }
 
 export interface Exercise {
@@ -26,11 +37,32 @@ export interface Exercise {
   current: number
   goal: number
   tempo: [number, number, number]
-  hist: number[]
   cues: string[]
   mistakes: string[]
   role: Role
   alts: Alt[]
+}
+
+/** One logged top set for a movement, recorded when a workout is finished. */
+export interface LiftEntry {
+  /** local YYYY-MM-DD */
+  date: string
+  /** heaviest completed set that session, in kg */
+  weight: number
+  reps: number
+  /** Epley estimated 1RM, in kg — comparable across rep counts */
+  e1rm: number
+}
+
+/**
+ * Real, earned progression for a single movement, keyed by movement name so a
+ * swapped-in alternative accumulates its own history exactly like a main lift.
+ */
+export interface LiftProgress {
+  start: number
+  current: number
+  goal: number
+  history: LiftEntry[]
 }
 
 /** A body-map zone (viewBox 0 0 100 206). `m: null` zones are neutral filler. */

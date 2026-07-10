@@ -1,8 +1,19 @@
 import { initialState, type AppState } from './state'
 import { SETTINGS } from './settings'
 import type { FlashKind, Group, Screen, Session, Summary, SummaryStatus, Unit, Workout, WorkoutExercise } from '../data/types'
-import { exercisesForType, fmtWeight, nextWeight, rankInfo, repTop, setCount, tailoredExercises } from '../lib/calc'
+import {
+  effectiveExercises,
+  exercisesForType,
+  fmtWeight,
+  nextWeight,
+  performedStats,
+  progressLift,
+  rankInfo,
+  repTop,
+  setCount,
+} from '../lib/calc'
 import { dayKey } from '../lib/day'
+import type { LiftProgress } from '../data/types'
 
 export type Action =
   | { type: 'NAV'; screen: Screen }
@@ -37,13 +48,18 @@ export type Action =
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
 
-const effEx = (s: AppState) => tailoredExercises(s.profile.bw, s.tailoredDone)
+const effEx = (s: AppState) => effectiveExercises(s.profile.bw, s.tailoredDone, s.lifts)
 const unitOf = (s: AppState, name: string): Unit => s.units[name] || 'kg'
 
 export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
-    case 'HYDRATE':
-      return { ...state, ...action.data }
+    case 'HYDRATE': {
+      // A blob saved before earned progression existed simply has no `lifts`.
+      // Never let a missing/!object value reach the view model as undefined.
+      const next = { ...state, ...action.data }
+      if (!next.lifts || typeof next.lifts !== 'object') next.lifts = {}
+      return next
+    }
     case 'RESET':
       return { ...initialState }
     case 'NAV':
@@ -102,9 +118,9 @@ export function reducer(state: AppState, action: Action): AppState {
       else sw[id] = name
       const src = effEx(state).find((x) => x.id === id)
       if (!src) return { ...state, swaps: sw, openSwap: null }
-      const altObj = name ? src.alts.find((a) => a.n === name) : null
-      const stats = altObj || src
-      const dispName = altObj ? altObj.n : src.name
+      // Resolve against the *new* swap map so the alt's own earned progress wins.
+      const stats = performedStats(src, sw, state.lifts)
+      const dispName = stats.name
       const nx = Math.min(stats.current + stats.inc, stats.goal)
       const rt = repTop(src)
       let w = state.workout
@@ -133,29 +149,29 @@ export function reducer(state: AppState, action: Action): AppState {
       const ex = effEx(state)
       const trainType = action.trainType
       const todayEx = exercisesForType(ex, trainType)
-      const buildSets = (e: (typeof todayEx)[number]) => {
-        const cnt = setCount(e)
-        const nx = nextWeight(e)
-        const rt = repTop(e)
-        return Array.from({ length: cnt }, () => ({
-          weight: nx,
-          reps: rt,
-          goalReps: rt,
-          target: nx,
-          prev: `${fmtWeight(e.current, unitOf(state, e.name))} × ${rt}`,
-          done: false,
-        }))
-      }
       const workout: Workout = {
         type: trainType,
-        exercises: todayEx.map<WorkoutExercise>((e) => ({
-          id: e.id,
-          name: e.name,
-          muscle: e.primary,
-          next: nextWeight(e),
-          group: e.group,
-          sets: buildSets(e),
-        })),
+        exercises: todayEx.map<WorkoutExercise>((e) => {
+          // Honour a saved swap: train the movement he actually picked, at its weights.
+          const st = performedStats(e, state.swaps, state.lifts)
+          const nx = nextWeight(st)
+          const rt = repTop(e)
+          return {
+            id: e.id,
+            name: st.name,
+            muscle: e.primary,
+            next: nx,
+            group: e.group,
+            sets: Array.from({ length: setCount(e) }, () => ({
+              weight: nx,
+              reps: rt,
+              goalReps: rt,
+              target: nx,
+              prev: `${fmtWeight(st.current, unitOf(state, st.name))} × ${rt}`,
+              done: false,
+            })),
+          }
+        }),
       }
       return { ...state, workout, elapsed: 0, screen: 'train' }
     }
@@ -226,8 +242,27 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'FINISH_WORKOUT': {
       const w = state.workout
       let summary: Summary | null = null
+      let lifts = state.lifts
       if (w) {
         const ex = effEx(state)
+        const today = dayKey(new Date())
+        // Fold what he actually lifted back into each movement's earned progression.
+        const nextLifts: Record<string, LiftProgress> = { ...state.lifts }
+        w.exercises.forEach((exi) => {
+          const src = ex.find((x) => x.id === exi.id)
+          if (!src) return
+          const st = performedStats(src, state.swaps, state.lifts)
+          const prev: LiftProgress = state.lifts[st.name] ?? {
+            start: st.start,
+            current: st.current,
+            goal: st.goal,
+            history: [],
+          }
+          const updated = progressLift(prev, exi.sets, st.inc, today)
+          if (updated !== prev) nextLifts[st.name] = updated
+        })
+        lifts = nextLifts
+
         let totalVolume = 0
         let setsDone = 0
         let setsPlanned = 0
@@ -295,6 +330,7 @@ export function reducer(state: AppState, action: Action): AppState {
         lastSummary: summary,
         screen: summary ? 'summary' : 'home',
         sessions,
+        lifts,
         xp: state.xp + xpGained,
         sessionsCompleted: summary && summary.setsDone > 0 ? state.sessionsCompleted + 1 : state.sessionsCompleted,
         targetsHitTotal: summary && summary.setsDone > 0 ? state.targetsHitTotal + summary.hitCount : state.targetsHitTotal,

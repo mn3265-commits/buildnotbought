@@ -1,4 +1,4 @@
-import { ImageSlot } from '../components/ImageSlot'
+import { MovementPreview } from '../components/MovementPreview'
 import type { ViewModel } from '../store/viewModel'
 
 export function Detail({ vm }: { vm: ViewModel }) {
@@ -23,15 +23,36 @@ export function Detail({ vm }: { vm: ViewModel }) {
         </div>
       </div>
 
-      {/* demo media + tempo */}
+      {/* movement preview — animated on this lift's real tempo */}
       <div style={{ padding: '0 20px', display: 'flex', gap: 12, marginBottom: 16 }}>
-        <div style={{ flex: 1, position: 'relative', height: 200, borderRadius: 18, overflow: 'hidden', border: '1px solid #2a2a31' }}>
-          <ImageSlot id={d.slotId} placeholder="Drop your form video / GIF" />
+        <div style={{ flex: 1, position: 'relative', height: 200, borderRadius: 18, overflow: 'hidden', border: '1px solid #2a2a31', background: '#0f0f12' }}>
+          <div style={{ position: 'absolute', inset: 0, padding: 10 }}>
+            <MovementPreview name={d.name} tempo={d.tempo} />
+          </div>
+          <span
+            style={{
+              position: 'absolute',
+              left: 12,
+              bottom: 10,
+              fontFamily: "'Archivo'",
+              fontSize: 9,
+              fontWeight: 700,
+              color: '#54545c',
+              letterSpacing: '.6px',
+            }}
+          >
+            {d.tempoStr} TEMPO · LOOPING
+          </span>
         </div>
         <div style={{ width: 78, flexShrink: 0, background: '#141417', border: '1px solid #26262c', borderRadius: 18, padding: '12px 0', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <span style={{ fontFamily: "'Archivo'", fontSize: 9, fontWeight: 700, color: '#7d7d86', letterSpacing: '.6px' }}>TEMPO</span>
-          <div style={{ position: 'relative', width: 8, height: 130, background: '#26262c', borderRadius: 5, margin: '10px 0' }}>
-            <div style={{ position: 'absolute', left: '50%', top: 0, transform: 'translateX(-50%)', width: 22, height: 22, borderRadius: '50%', background: '#CCFF00', boxShadow: '0 0 14px #CCFF0088', animation: `repmove ${d.tempoDur} ease-in-out infinite` }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '12px 0', alignItems: 'center' }}>
+            {d.tempoParts.map((t) => (
+              <div key={t.label} style={{ textAlign: 'center' }}>
+                <div style={{ fontFamily: "'Anton'", fontSize: 17, color: t.color, lineHeight: 1 }}>{t.sec}</div>
+                <div style={{ fontFamily: "'Archivo'", fontSize: 8, fontWeight: 700, color: '#61616a', letterSpacing: '.4px', marginTop: 2 }}>{t.label}</div>
+              </div>
+            ))}
           </div>
           <span style={{ fontFamily: "'Anton'", fontSize: 13, color: '#CCFF00' }}>{d.tempoStr}</span>
         </div>

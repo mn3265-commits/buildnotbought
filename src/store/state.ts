@@ -1,5 +1,5 @@
 import { ROTATION } from '../data/exercises'
-import type { FlashKind, Group, Profile, Screen, Session, Summary, Unit, WeightEntry, Workout } from '../data/types'
+import type { FlashKind, Group, LiftProgress, Profile, Screen, Session, Summary, Unit, WeightEntry, Workout } from '../data/types'
 
 export interface AppState {
   // ── persisted ──
@@ -13,6 +13,11 @@ export interface AppState {
   units: Record<string, Unit>
   swaps: Record<number, string>
   sessions: Session[]
+  /**
+   * Earned progression per movement name. Absent = never trained, so the
+   * seeded/tailored baseline still applies. Written only by FINISH_WORKOUT.
+   */
+  lifts: Record<string, LiftProgress>
 
   // ── ephemeral / navigation ──
   screen: Screen
@@ -44,6 +49,7 @@ export const initialState: AppState = {
   units: {},
   swaps: {},
   sessions: [],
+  lifts: {},
 
   screen: 'home',
   filter: 'All',
@@ -75,6 +81,7 @@ export const PERSIST_KEYS = [
   'units',
   'swaps',
   'sessions',
+  'lifts',
 ] as const
 
 export const STORAGE_KEY = 'gym-tracker:v2'

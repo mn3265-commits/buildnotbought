@@ -150,20 +150,6 @@ button {
   font-family: inherit;
 }
 
-@keyframes repmove {
-  0% {
-    transform: translateY(0);
-  }
-  45% {
-    transform: translateY(118px);
-  }
-  55% {
-    transform: translateY(118px);
-  }
-  100% {
-    transform: translateY(0);
-  }
-}
 @keyframes pulseDot {
   0%,
   100% {

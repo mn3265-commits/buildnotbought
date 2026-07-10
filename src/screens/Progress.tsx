@@ -18,17 +18,43 @@ export function Progress({ vm }: { vm: ViewModel }) {
           </div>
         </div>
 
-        {/* chart */}
-        <svg viewBox="0 0 300 130" preserveAspectRatio="none" style={{ width: '100%', height: 130, margin: '14px 0 6px', overflow: 'visible' }}>
-          <line x1="0" y1={vm.prog.goalY} x2="300" y2={vm.prog.goalY} stroke="#CCFF00" strokeWidth="1.2" strokeDasharray="5 5" opacity=".55" />
-          <polyline points={vm.prog.linePts} fill="none" stroke="#CCFF00" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-          <polyline points={vm.prog.areaPts} fill="#CCFF0018" stroke="none" />
-          {vm.prog.dots.map((d, i) => (
-            <circle key={i} cx={d.x} cy={d.y} r="3.4" fill="#0B0B0D" stroke="#CCFF00" strokeWidth="2.2" />
-          ))}
-        </svg>
+        {/* chart — real logged top sets, or an honest empty state */}
+        {vm.prog.hasCurve ? (
+          <svg viewBox="0 0 300 130" preserveAspectRatio="none" style={{ width: '100%', height: 130, margin: '14px 0 6px', overflow: 'visible' }}>
+            <line x1="0" y1={vm.prog.goalY} x2="300" y2={vm.prog.goalY} stroke="#CCFF00" strokeWidth="1.2" strokeDasharray="5 5" opacity=".55" />
+            <polyline points={vm.prog.areaPts} fill="#CCFF0018" stroke="none" />
+            <polyline points={vm.prog.linePts} fill="none" stroke="#CCFF00" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+            {vm.prog.dots.map((d, i) => (
+              <circle key={i} cx={d.x} cy={d.y} r="3.4" fill="#0B0B0D" stroke="#CCFF00" strokeWidth="2.2" />
+            ))}
+          </svg>
+        ) : (
+          <div
+            style={{
+              height: 130,
+              margin: '14px 0 6px',
+              borderRadius: 14,
+              border: '1px dashed #2f3d0a',
+              background: '#0f0f12',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              padding: '0 22px',
+              textAlign: 'center',
+            }}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5c6b28" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 17l6-6 4 4 7-7" />
+            </svg>
+            <span style={{ fontFamily: "'Archivo'", fontSize: 12, fontWeight: 600, color: '#61616a', lineHeight: 1.45 }}>{vm.prog.emptyHint}</span>
+          </div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: "'Archivo'", fontSize: 10, color: '#61616a', fontWeight: 600, marginTop: 2 }}>
-          <span>start {vm.prog.startStr}</span><span style={{ color: '#a9c93f' }}>goal {vm.prog.goalStr}</span>
+          <span>start {vm.prog.startStr}</span>
+          <span>{vm.prog.sessionCount > 0 ? `best e1RM ${vm.prog.bestE1rmStr}` : `${vm.prog.sessionCount} sessions`}</span>
+          <span style={{ color: '#a9c93f' }}>goal {vm.prog.goalStr}</span>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 16 }}>
