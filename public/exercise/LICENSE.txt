@@ -1,0 +1,36 @@
+Exercise illustrations
+======================
+
+Source:  Everkinetic — https://github.com/everkinetic/data
+License: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
+         https://creativecommons.org/licenses/by-sa/4.0/
+
+The SVG files in this directory are redistributed unmodified. The app recolours
+them at display time (CSS invert) so they read on a dark background; the files
+themselves are byte-for-byte as published.
+
+Under CC BY-SA 4.0 these illustrations, and any adaptation of them, remain under
+the same licence. Attribution is shown in the app on each exercise's detail
+screen and repeated here.
+
+Per-lift source illustration:
+
+  Bench Press          <- Bench Press
+  Overhead Press       <- Seated Military Press
+  Incline DB Press     <- Incline Dumbbell Press
+  Triceps Pushdown     <- Triceps Pushdown with Cable
+  Lateral Raise        <- Lateral Dumbbell Raises
+  Deadlift             <- Barbell Dead Lifts
+  Weighted Pull-up     <- Pull Ups
+  Barbell Row          <- Reverse Grips Bent Over Barbell Rows
+  Lat Pulldown         <- Underhand Pull-down
+  Barbell Curl         <- Biceps Curls with Barbell
+  Back Squat           <- Barbell Squat
+  Romanian Deadlift    <- Romanian Dead Lift
+  Leg Press            <- Leg Press
+  Seated Leg Curl      <- Seated Leg Curl
+  Standing Calf Raise  <- Standing Barbell Calf Raise
+
+Three of these are the closest honest variant Everkinetic publishes rather than
+an exact match, and the app says so on screen:
+  Overhead Press (seated), Barbell Row (underhand grip), Lat Pulldown (underhand grip).

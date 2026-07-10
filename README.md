@@ -69,3 +69,16 @@ required.
 
 The app uses the Anton / Archivo / Archivo Expanded webfonts from Google Fonts (see
 `index.html`); it degrades to system fonts where that CDN is unreachable.
+
+## Exercise illustrations
+
+Each lift shows the two ends of the movement — muscle stretched, then contracted —
+using line art from the [Everkinetic](https://github.com/everkinetic/data) open
+dataset, licensed **CC BY-SA 4.0** and self-hosted in `public/exercise/` so it
+loads instantly on gym wifi. Files are redistributed unmodified; the dark-theme
+recolour is a CSS filter at display time. Attribution is shown in-app on every
+exercise, and in `public/exercise/LICENSE.txt`.
+
+wger's community image uploads are deliberately *not* used: spot-checks turned up
+a dumbbell deadlift filed as "Deadlifts" and a watermarked HOIST(R) product photo
+uploaded under a CC-BY-SA claim.

@@ -1,4 +1,4 @@
-import { MovementPreview } from '../components/MovementPreview'
+import { ExerciseFigure } from '../components/ExerciseFigure'
 import type { ViewModel } from '../store/viewModel'
 
 export function Detail({ vm }: { vm: ViewModel }) {
@@ -23,38 +23,18 @@ export function Detail({ vm }: { vm: ViewModel }) {
         </div>
       </div>
 
-      {/* movement preview — animated on this lift's real tempo */}
-      <div style={{ padding: '0 20px', display: 'flex', gap: 12, marginBottom: 16 }}>
-        <div style={{ flex: 1, position: 'relative', height: 200, borderRadius: 18, overflow: 'hidden', border: '1px solid #2a2a31', background: '#0f0f12' }}>
-          <div style={{ position: 'absolute', inset: 0, padding: 10 }}>
-            <MovementPreview name={d.performedName} tempo={d.tempo} />
-          </div>
-          <span
-            style={{
-              position: 'absolute',
-              left: 12,
-              bottom: 10,
-              fontFamily: "'Archivo'",
-              fontSize: 9,
-              fontWeight: 700,
-              color: '#54545c',
-              letterSpacing: '.6px',
-            }}
-          >
-            {d.tempoStr} TEMPO · LOOPING
-          </span>
-        </div>
-        <div style={{ width: 78, flexShrink: 0, background: '#141417', border: '1px solid #26262c', borderRadius: 18, padding: '12px 0', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <span style={{ fontFamily: "'Archivo'", fontSize: 9, fontWeight: 700, color: '#7d7d86', letterSpacing: '.6px' }}>TEMPO</span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '12px 0', alignItems: 'center' }}>
-            {d.tempoParts.map((t) => (
-              <div key={t.label} style={{ textAlign: 'center' }}>
-                <div style={{ fontFamily: "'Anton'", fontSize: 17, color: t.color, lineHeight: 1 }}>{t.sec}</div>
-                <div style={{ fontFamily: "'Archivo'", fontSize: 8, fontWeight: 700, color: '#61616a', letterSpacing: '.4px', marginTop: 2 }}>{t.label}</div>
-              </div>
-            ))}
-          </div>
-          <span style={{ fontFamily: "'Anton'", fontSize: 13, color: '#CCFF00' }}>{d.tempoStr}</span>
+      {/* the rep's start and end, plus the prescribed tempo */}
+      <div style={{ padding: '0 20px', marginBottom: 16 }}>
+        <ExerciseFigure name={d.performedName} />
+        <div style={{ marginTop: 10, background: '#141417', border: '1px solid #26262c', borderRadius: 14, padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <span style={{ fontFamily: "'Archivo'", fontSize: 9, fontWeight: 700, color: '#7d7d86', letterSpacing: '.6px', flexShrink: 0 }}>TEMPO</span>
+          {d.tempoParts.map((t) => (
+            <div key={t.label} style={{ textAlign: 'center', flex: 1 }}>
+              <div style={{ fontFamily: "'Anton'", fontSize: 18, color: t.color, lineHeight: 1 }}>{t.sec}s</div>
+              <div style={{ fontFamily: "'Archivo'", fontSize: 8, fontWeight: 700, color: '#61616a', letterSpacing: '.4px', marginTop: 2 }}>{t.label}</div>
+            </div>
+          ))}
+          <span style={{ fontFamily: "'Anton'", fontSize: 14, color: '#CCFF00', flexShrink: 0 }}>{d.tempoStr}</span>
         </div>
       </div>
 

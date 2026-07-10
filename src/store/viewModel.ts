@@ -518,7 +518,6 @@ function build(S: AppState, A: Actions, email?: string) {
     currentStr: kg(de.current, de.name),
     goalStr: kg(de.goal, de.name),
     nextStr: kg(nextWeight(de), de.name),
-    tempo: de.tempo,
     tempoParts: [
       { label: 'DOWN', sec: de.tempo[0], color: '#F4F4F5' },
       { label: 'HOLD', sec: de.tempo[1], color: '#8a8a93' },
