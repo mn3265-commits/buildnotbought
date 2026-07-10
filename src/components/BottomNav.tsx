@@ -8,13 +8,15 @@ export function BottomNav({ vm }: { vm: ViewModel }) {
         bottom: 0,
         left: 0,
         right: 0,
-        height: 88,
+        // grow past the iPhone home indicator; env() is 0px on desktop
+        height: 'calc(88px + env(safe-area-inset-bottom, 0px))',
         background: 'linear-gradient(transparent,#0B0B0D 34%)',
         zIndex: 30,
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'space-around',
         padding: '14px 12px 0',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         borderTop: '1px solid #1b1b1f',
       }}
     >

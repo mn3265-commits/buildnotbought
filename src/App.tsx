@@ -22,46 +22,10 @@ export default function App() {
   const { user, loading } = useAuth()
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        width: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '32px 16px',
-        background: 'radial-gradient(1200px 700px at 50% -10%, #17170c 0%, #050506 60%)',
-        fontFamily: "'Archivo', sans-serif",
-      }}
-    >
-      <div
-        style={{
-          position: 'relative',
-          width: 390,
-          height: 844,
-          background: '#0B0B0D',
-          borderRadius: 46,
-          border: '1px solid #232329',
-          boxShadow: '0 40px 120px rgba(0,0,0,.7), 0 0 0 11px #0e0e11, 0 0 0 12px #26262c',
-          overflow: 'hidden',
-        }}
-      >
-        {/* status bar */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 52,
-            display: 'flex',
-            alignItems: 'flex-end',
-            justifyContent: 'space-between',
-            padding: '0 30px 8px',
-            zIndex: 40,
-            pointerEvents: 'none',
-          }}
-        >
+    <div className="app-shell">
+      <div className="phone">
+        {/* simulated status bar — desktop mock only; hidden on real devices */}
+        <div className="status-bar">
           <span style={{ fontFamily: "'Archivo'", fontWeight: 700, fontSize: 15, color: '#F4F4F5', letterSpacing: '.3px' }}>{vm.statusTime}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             <svg width="18" height="12" viewBox="0 0 18 12" fill="#F4F4F5">
@@ -87,8 +51,8 @@ export default function App() {
         ) : (
           <>
             {/* scroll content */}
-            <div data-scroll style={{ position: 'absolute', top: 52, left: 0, right: 0, bottom: 0, overflowY: 'auto', overflowX: 'hidden' }}>
-              <div style={{ minHeight: '100%', paddingBottom: 104 }}>
+            <div data-scroll className="screen-scroll">
+              <div style={{ minHeight: '100%', paddingBottom: 'calc(104px + env(safe-area-inset-bottom, 0px))' }}>
                 {vm.isHome && <Home vm={vm} />}
                 {vm.isTrain && <Train vm={vm} />}
                 {vm.isLibrary && <Library vm={vm} />}
