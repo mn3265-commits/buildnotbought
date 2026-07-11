@@ -82,3 +82,15 @@ exercise, and in `public/exercise/LICENSE.txt`.
 wger's community image uploads are deliberately *not* used: spot-checks turned up
 a dumbbell deadlift filed as "Deadlifts" and a watermarked HOIST(R) product photo
 uploaded under a CC-BY-SA claim.
+
+## Offline & install
+
+A service worker (via `vite-plugin-pwa`) precaches the app shell and runtime-
+caches the exercise art, so the app opens and runs with no signal — which is the
+normal state of gym wifi. State lives in `localStorage` and syncs to Turso with
+last-write-wins by timestamp, so edits made offline are pushed on reconnect and
+never clobbered by a staler cloud copy on reopen. The API itself is never cached
+(NetworkOnly); offline reads fall back to the local copy.
+
+Installable to the home screen with a real icon and a standalone, portrait,
+fullscreen launch (`manifest.webmanifest` + apple-touch-icon).

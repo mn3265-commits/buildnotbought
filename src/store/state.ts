@@ -96,6 +96,17 @@ export const PERSIST_KEYS = [
 ] as const
 
 export const STORAGE_KEY = 'gym-tracker:v2'
+/** When the local copy was last written — drives last-write-wins on reopen. */
+export const STORAGE_TS_KEY = 'gym-tracker:v2:ts'
+
+/** ms of the last local save, or 0 if never / unavailable. */
+export function readLocalTs(): number {
+  try {
+    return Number(localStorage.getItem(STORAGE_TS_KEY)) || 0
+  } catch {
+    return 0
+  }
+}
 
 export function loadPersisted(): Partial<AppState> {
   try {
@@ -117,6 +128,8 @@ export function savePersisted(state: AppState): void {
     const out: Record<string, unknown> = {}
     for (const k of PERSIST_KEYS) out[k] = state[k]
     localStorage.setItem(STORAGE_KEY, JSON.stringify(out))
+    // stamp the write so a reopen can tell newer offline edits from a stale cloud copy
+    localStorage.setItem(STORAGE_TS_KEY, String(Date.now()))
   } catch {
     /* storage unavailable — run in-memory */
   }

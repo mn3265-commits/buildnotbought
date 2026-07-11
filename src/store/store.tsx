@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react'
 import { reducer, type Action } from './reducer'
-import { initialState, loadPersisted, savePersisted, STORAGE_KEY, type AppState } from './state'
+import { initialState, loadPersisted, readLocalTs, savePersisted, STORAGE_KEY, type AppState } from './state'
 import type { Group, Screen, Unit, MeasureEntry } from '../data/types'
 import { useAuth } from './auth'
 import { loadRemote, pickPersisted, saveRemote } from './sync'
@@ -79,17 +79,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     let cancelled = false
     hydratedRef.current = null
-    loadRemote(user.id).then(({ status, data }) => {
+    loadRemote(user.id).then(({ status, data, ts }) => {
       if (cancelled) return
       if (status === 'ok' && data) {
-        dispatchRef.current({ type: 'HYDRATE', data })
-        hydratedRef.current = user.id // safe to sync
+        // Last-write-wins: if this device has newer local edits (made offline
+        // and never pushed), keep them and let the debounced effect push them
+        // up. Otherwise the cloud copy is authoritative — hydrate from it.
+        const localTs = readLocalTs()
+        if (localTs > ts) {
+          hydratedRef.current = user.id // local is newer — push it, don't clobber it
+        } else {
+          dispatchRef.current({ type: 'HYDRATE', data })
+          hydratedRef.current = user.id
+        }
       } else if (status === 'empty') {
         dispatchRef.current({ type: 'RESET' }) // brand-new account starts clean
         hydratedRef.current = user.id // first save creates the row
       }
-      // status === 'error': keep local cache, leave hydratedRef null so we never
-      // overwrite the cloud copy with a half-loaded/empty state this session.
+      // status === 'error' (offline): keep local cache, leave hydratedRef null so
+      // we never overwrite the cloud copy with a half-loaded/empty state.
     })
     return () => {
       cancelled = true
@@ -100,7 +108,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user || hydratedRef.current !== user.id) return
     const t = setTimeout(() => {
-      void saveRemote(user.id, pickPersisted(state))
+      void saveRemote(user.id, pickPersisted(state), readLocalTs())
     }, 800)
     return () => clearTimeout(t)
   }, [state, user])
